@@ -1,0 +1,6 @@
+todo
+- styling of title and btn
+- logo
+- mobile?
+- fix suggestions
+
