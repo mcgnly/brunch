@@ -12,7 +12,7 @@ import stations from "./stations.json";
 import { getDestination } from "./getDestination";
 import { InfoBoxContents } from "./InfoBoxContents";
 import { getStation } from "./getStation";
-import mapStyles from "./mapStyles";
+// import mapStyles from "./mapStyles";
 
 // set outside of component so as not to become a new array during every component refresh
 const libraries = ["places"];
