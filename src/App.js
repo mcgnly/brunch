@@ -3,105 +3,88 @@ import {
   Marker,
   TransitLayer,
   useLoadScript,
-  InfoWindow,
+  InfoWindow
 } from "@react-google-maps/api";
-import React, { useState } from "react";
-
+import React from "react";
 import "./App.css";
-import stations from "./stations.json";
-import { getDestination } from "./getDestination";
+import stationList from "./stationList.json";
 import { InfoBoxContents } from "./InfoBoxContents";
-import { getStation } from "./getStation";
-// import mapStyles from "./mapStyles";
-
+import calculateDistance from "./calculateDistance";
 // set outside of component so as not to become a new array during every component refresh
 const libraries = ["places"];
 
 const mapStyle = {
   width: "100vw",
-  height: "100vh",
+  height: "100vh"
 };
 
 const options = {
   disableDefaultUI: true,
-//   styles: mapStyles,
-  zoomControl: true,
+  zoomControl: true
 };
 const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
 function App() {
-  const [station, setStation] = useState("");
-  const [searchType, setSearchType] = useState("breakfast");
-  const [error, setError] = useState("");
-  const [infoBoxOpen, setInfoBoxOpen] = useState(false);
-  const [stationMarker, setStationMarker] = useState({});
-  const [destinationMarker, setDestinationMarker] = useState({});
-  const [destination, setDestination] = useState({});
-
-  const mapZoom = 11;
   //   start at center of Berlin
   const mapCenter = {
     lat: 52.52,
-    lng: 13.405,
+    lng: 13.405
   };
+  const [station, setStation] = React.useState("");
+  const [mapZoom, setMapZoom] = React.useState(11);
+  const [searchType, setSearchType] = React.useState("breakfast");
+  const [error, setError] = React.useState("");
+  const [infoBoxOpen, setInfoBoxOpen] = React.useState(false);
+  const [stationMarker, setStationMarker] = React.useState({});
+  const [destinationMarker, setDestinationMarker] = React.useState(mapCenter);
+  const [destination, setDestination] = React.useState({});
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey,
     // helps not randomly reload and recenter map
-    libraries,
+    libraries
   });
 
   const mapRef = React.useRef();
-  const throttling = React.useRef(false);
   const onMapLoad = React.useCallback((map) => {
     mapRef.current = map;
   }, []);
 
-  const panTo = React.useCallback((destinationCoords) => {
-    const lat = destinationCoords.lat;
-    const lng = destinationCoords.lng;
-    mapRef.current.setZoom(15);
-    mapRef.current.panTo({ lat, lng });
-  }, []);
-
-  const randomlyPickStation = (panTo) => {
-    if (throttling.current) {
-      return;
-    }
-    throttling.current = true;
+  const randomlyPickStation = () => {
+    const stations = Object.keys(stationList);
     const amountOfChoices = stations.length;
     const randomIndex = Math.floor(Math.random() * amountOfChoices);
     const selectedStation = stations[randomIndex];
+    const stationLatLng = stationList[selectedStation].station;
     setStation(selectedStation);
+    setStationMarker(stationLatLng);
 
-    getStation(selectedStation, setStationMarker)
-      .then((stationLatLng) => {
-        return getDestination(
-          stationLatLng,
-          apiKey,
-          searchType,
-          setDestination,
-          setDestinationMarker,
-          setError
-        );
-      })
-      .then((coordinates) => {
-        panTo(coordinates);
-        setInfoBoxOpen(true);
-      })
-      .catch((err) => console.log("😱 main thread Error: ", err));
-    setTimeout(() => {
-      throttling.current = false;
-    }, 5000);
+    const destinationLatLng =
+      stationList[selectedStation][searchType]?.geometry?.location;
+
+    if (destinationLatLng === undefined) {
+      setError("sorry, no good options near this station, try again");
+    }
+    setDestination(stationList[selectedStation][searchType]);
+    setDestinationMarker(destinationLatLng);
+    const distance = calculateDistance(stationLatLng, destinationLatLng) * 1000;
+    if (distance > 500) {
+      setMapZoom(15);
+    } else if (300 < distance < 500) {
+      setMapZoom(16.5);
+    } else {
+      setMapZoom(18);
+    }
+    setInfoBoxOpen(true);
   };
 
-  function StationRandomizer({ panTo, station, randomlyPickStation }) {
+  function StationRandomizer() {
     return (
       <div>
         <button
           className="btn"
           onClick={() => {
-            randomlyPickStation(panTo);
+            randomlyPickStation();
           }}
         >
           roll the dice
@@ -119,7 +102,7 @@ function App() {
   return (
     <div className="App">
       <GoogleMap
-        center={mapCenter}
+        center={destinationMarker}
         mapContainerStyle={mapStyle}
         zoom={mapZoom}
         onLoad={onMapLoad}
@@ -147,15 +130,22 @@ function App() {
               key={`${destinationMarker.lat}-${destinationMarker.lng}`}
               position={{
                 lat: destinationMarker.lat,
-                lng: destinationMarker.lng,
+                lng: destinationMarker.lng
               }}
+              onClick={() => setInfoBoxOpen(true)}
             />
             {infoBoxOpen && (
               <InfoWindow
                 onCloseClick={() => setInfoBoxOpen(false)}
                 position={{
-                  lat: destinationMarker.lat,
-                  lng: destinationMarker.lng,
+                  lat:
+                    destinationMarker.lat +
+                    (mapZoom === 15
+                      ? 0.001
+                      : mapZoom === 16.5
+                      ? 0.0003
+                      : 0.00001),
+                  lng: destinationMarker.lng
                 }}
               >
                 <InfoBoxContents
@@ -169,11 +159,7 @@ function App() {
           </div>
         )}
         <div>
-          <StationRandomizer
-            panTo={panTo}
-            station={station}
-            randomlyPickStation={randomlyPickStation}
-          />
+          <StationRandomizer />
         </div>
         <div className={"searchingFor"}>
           <h4>What are you looking for today?</h4>

@@ -1,6 +1,5 @@
 todo
-- styling of title and btn
-- logo
-- mobile?
-- fix suggestions
+- mobile
+- fn to update diff to brunches
+- github action to get brunch
 
